@@ -1,0 +1,105 @@
+<!doctype html>
+<!--
+  index.html - The chat page for the chatbot.
+  main.py serves this file at http://127.0.0.1:8000/
+  The page sends each message to the server's /chat endpoint
+  and shows the reply in the chat window.
+-->
+<html lang="en">
+<head>
+  <!-- Character encoding, so emoji and non-English text display correctly -->
+  <meta charset="utf-8">
+  <!-- Makes the page scale properly on phones -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Text shown on the browser tab -->
+  <title>My OpenAI Chatbot</title>
+  <style>
+    /* Page layout: centered column, at most 700px wide */
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 16px; }
+
+    /* The chat window: fixed height, scrolls when messages overflow */
+    #log { border: 1px solid #ccc; border-radius: 8px; padding: 12px; height: 400px; overflow-y: auto; }
+
+    /* Each message. pre-wrap keeps line breaks from the model's reply */
+    .msg { margin: 8px 0; white-space: pre-wrap; }
+
+    /* User messages in blue, bot messages in dark gray */
+    .user { color: #0b5cad; }
+    .bot { color: #222; }
+
+    /* Input row: the text box stretches, the button stays its natural size */
+    form { display: flex; gap: 8px; margin-top: 12px; }
+    input { flex: 1; padding: 8px; }
+    button { padding: 8px 16px; }
+  </style>
+</head>
+<body>
+  <h1>My OpenAI Chatbot</h1>
+
+  <!-- Chat window: messages are added here by the script below -->
+  <div id="log"></div>
+
+  <!-- Message box and Send button.
+       "required" stops the form from submitting while the box is empty. -->
+  <form id="form">
+    <input id="input" placeholder="Type a message..." autocomplete="off" required>
+    <button type="submit">Send</button>
+  </form>
+
+  <script>
+    // Grab the page elements the script works with
+    const log = document.getElementById("log");      // chat window
+    const form = document.getElementById("form");    // input form
+    const input = document.getElementById("input");  // text box
+
+    // Add one message to the chat window.
+    //   text - what to display
+    //   cls  - "user" or "bot", which picks the color from the CSS above
+    function add(text, cls) {
+      const div = document.createElement("div");
+      div.className = "msg " + cls;
+      // textContent (not innerHTML) shows the text as-is, so any HTML
+      // inside a message is displayed rather than run
+      div.textContent = text;
+      log.appendChild(div);
+      // Scroll to the bottom so the newest message is visible
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // Runs when the user clicks Send or presses Enter
+    form.addEventListener("submit", async (e) => {
+      // Stop the browser's default form behavior (reloading the page)
+      e.preventDefault();
+
+      // Read the message and skip it if it's only spaces
+      const message = input.value.trim();
+      if (!message) return;
+
+      // Show the user's message right away and clear the box
+      add("You: " + message, "user");
+      input.value = "";
+
+      try {
+        // Send the message to the server.
+        // The body matches the ChatRequest model in main.py: {"message": "..."}
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message })
+        });
+
+        // The server replies with JSON:
+        //   success -> {"reply": "..."}
+        //   error   -> {"detail": "..."}
+        const data = await res.json();
+
+        // res.ok is true for 2xx status codes. Show the reply or the error text.
+        add("Bot: " + (res.ok ? data.reply : data.detail), "bot");
+      } catch (err) {
+        // Network failure, e.g. the server isn't running
+        add("Error: " + err.message, "bot");
+      }
+    });
+  </script>
+</body>
+</html>
